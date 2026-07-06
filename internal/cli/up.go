@@ -25,7 +25,9 @@ var (
 	kafkaUser          string
 	kafkaPassword      string
 	kafkaTopicList     string
+	kafkaTopics        string
 	kafkaUIPort        int
+	kafkaUIOnlyPort    int
 )
 
 var upCmd = &cobra.Command{
@@ -104,6 +106,18 @@ var upKafkaCmd = &cobra.Command{
 			}, kafkaTopicList))
 		}
 
+		if kafkaTopics != "" {
+			topicCtx, cancel := context.WithTimeout(ctx, 90*time.Second)
+			defer cancel()
+			exitOnError(kafka.CreateTopics(topicCtx, kafka.AuthConfig{
+				Port:      result.Port,
+				Protocol:  kafkaProtocol,
+				Mechanism: kafkaMechanism,
+				User:      kafkaUser,
+				Password:  kafkaPassword,
+			}, kafka.ParseTopics(kafkaTopics)))
+		}
+
 		if kafkaUIPort != 0 {
 			uiName := docker.KafkaUIName(name)
 			exitOnError(resolvePortConflict(ctx, cli, uiName, kafkaUIPort))
@@ -118,6 +132,27 @@ var upKafkaCmd = &cobra.Command{
 			})
 			exitOnError(err)
 		}
+	},
+}
+
+var upKafkaUICmd = &cobra.Command{
+	Use:   "kafka-ui <name>",
+	Short: "Create or start a Kafka UI container",
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		ctx := cmd.Context()
+		name := args[0]
+
+		cli, err := docker.NewClient(ctx)
+		exitOnError(err)
+
+		exitOnError(resolvePortConflict(ctx, cli, name, kafkaUIOnlyPort))
+
+		_, err = docker.UpKafkaUI(ctx, cli, docker.KafkaUIUpOptions{
+			Name: name,
+			Port: kafkaUIOnlyPort,
+		})
+		exitOnError(err)
 	},
 }
 
@@ -159,9 +194,14 @@ func init() {
 	upKafkaCmd.Flags().StringVar(&kafkaUser, "user", "admin", "Kafka SASL username")
 	upKafkaCmd.Flags().StringVar(&kafkaPassword, "password", "admin", "Kafka SASL password")
 	upKafkaCmd.Flags().StringVar(&kafkaTopicList, "topic-list", "", "file containing Kafka topic names to create")
+	upKafkaCmd.Flags().StringVar(&kafkaTopics, "topics", "", "comma-separated Kafka topic names to create")
 	upKafkaCmd.Flags().IntVar(&kafkaUIPort, "ui-port", 0, "host port to bind Kafka UI on (creates a separate spin container named <name>-ui)")
+	upKafkaUICmd.Flags().IntVar(&kafkaUIOnlyPort, "port", 9000, "host port to bind Kafka UI on")
+
+	upKafkaCmd.MarkFlagsMutuallyExclusive("topic-list", "topics")
 
 	upCmd.AddCommand(upPostgresCmd)
 	upCmd.AddCommand(upKafkaCmd)
+	upCmd.AddCommand(upKafkaUICmd)
 	rootCmd.AddCommand(upCmd)
 }

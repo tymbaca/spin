@@ -63,26 +63,46 @@ spin up kafka mykafka \
   --password mypass
 ```
 
-Create topics from a file (one topic per line, `#` for comments):
+Create topics inline:
+
+```bash
+spin up kafka mykafka --topics orders,payments,events
+```
+
+Or from a file (one topic per line, `#` for comments):
 
 ```
 # topics.txt
 orders
 payments
+events
 ```
 
 ```bash
-
 spin up kafka mykafka --topic-list topics.txt
 ```
 
-Add Kafka UI (separate container named `mykafka-ui`):
+> `--topics` and `--topic-list` cannot be used together.
+
+Start an unconfigured Kafka UI container (available on `:9000` by default):
+
+```bash
+spin up kafka-ui my-ui
+```
+
+Open http://127.0.0.1:9000
+
+Use a custom Kafka UI port:
+
+```bash
+spin up kafka-ui my-ui --port 8080
+```
+
+Create Kafka with a configured Kafka UI cluster (separate container named `mykafka-ui`):
 
 ```bash
 spin up kafka mykafka --ui-port 8080
 ```
-
-Open http://127.0.0.1:8080
 
 Kafka UI is independent — stopping or removing `mykafka` does not touch `mykafka-ui`:
 
@@ -119,10 +139,22 @@ Stop a container (keeps data):
 spin down mydb
 ```
 
+Stop all spin-managed containers:
+
+```bash
+spin down --all
+```
+
 Remove a container and its volume:
 
 ```bash
 spin rm mydb
+```
+
+Remove all spin-managed containers and their volumes:
+
+```bash
+spin rm --all
 ```
 
 ## Port conflicts
@@ -138,18 +170,15 @@ port 5432 is used by spin container "olddb" (running). Spin it down and continue
 ```bash
 # start services for a project
 spin up postgres api-db --migrations ./migrations
-spin up kafka api-kafka --topic-list topics.txt --ui-port 8080
+spin up kafka api-kafka --topics orders,payments
+spin up kafka-ui api-kafka-ui
 
 # check what's running
 spin ls -o wide
 
 # done for the day
-spin down api-db
-spin down api-kafka
-spin down api-kafka-ui
+spin down --all
 
 # clean up completely
-spin rm api-db
-spin rm api-kafka
-spin rm api-kafka-ui
+spin rm --all
 ```

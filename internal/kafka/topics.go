@@ -66,13 +66,38 @@ func WaitForKafka(ctx context.Context, cfg AuthConfig) error {
 }
 
 func CreateTopicsFromFile(ctx context.Context, cfg AuthConfig, path string) error {
-	cfg = cfg.withDefaults()
 	topics, err := readTopicList(path)
 	if err != nil {
 		return err
 	}
+	return createTopics(ctx, cfg, topics, path)
+}
+
+func CreateTopics(ctx context.Context, cfg AuthConfig, topics []string) error {
+	return createTopics(ctx, cfg, topics, "command line")
+}
+
+func ParseTopics(s string) []string {
+	seen := make(map[string]struct{})
+	var topics []string
+	for _, part := range strings.Split(s, ",") {
+		topic := strings.TrimSpace(part)
+		if topic == "" {
+			continue
+		}
+		if _, ok := seen[topic]; ok {
+			continue
+		}
+		seen[topic] = struct{}{}
+		topics = append(topics, topic)
+	}
+	return topics
+}
+
+func createTopics(ctx context.Context, cfg AuthConfig, topics []string, source string) error {
+	cfg = cfg.withDefaults()
 	if len(topics) == 0 {
-		fmt.Printf("no topics found in %s\n", path)
+		fmt.Printf("no topics found in %s\n", source)
 		return nil
 	}
 
@@ -105,7 +130,7 @@ func CreateTopicsFromFile(ctx context.Context, cfg AuthConfig, path string) erro
 	}
 
 	if len(configs) == 0 {
-		fmt.Printf("topics already exist from %s\n", path)
+		fmt.Printf("topics already exist from %s\n", source)
 		return nil
 	}
 
@@ -113,7 +138,7 @@ func CreateTopicsFromFile(ctx context.Context, cfg AuthConfig, path string) erro
 		return fmt.Errorf("create topics: %w", err)
 	}
 
-	fmt.Printf("created %d topic(s) from %s\n", len(configs), path)
+	fmt.Printf("created %d topic(s) from %s\n", len(configs), source)
 	return nil
 }
 

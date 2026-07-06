@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 )
@@ -38,6 +39,22 @@ func (opts KafkaUIUpOptions) withDefaults() KafkaUIUpOptions {
 func UpKafkaUI(ctx context.Context, cli *client.Client, opts KafkaUIUpOptions) (UpResult, error) {
 	opts = opts.withDefaults()
 	result := UpResult{Port: opts.Port}
+
+	if opts.KafkaName != "" {
+		kafkaContainer, err := FindByName(ctx, cli, opts.KafkaName)
+		if err != nil {
+			return result, err
+		}
+		if kafkaContainer == nil {
+			return result, fmt.Errorf("kafka container %q not found; run spin up kafka %q first", opts.KafkaName, opts.KafkaName)
+		}
+		if kafkaContainer.Service != ServiceKafka {
+			return result, fmt.Errorf("container %q is %s, not kafka", opts.KafkaName, kafkaContainer.Service)
+		}
+		if err := requireKafkaWithUI(ctx, cli, opts.KafkaName); err != nil {
+			return result, err
+		}
+	}
 
 	existing, err := FindByName(ctx, cli, opts.Name)
 	if err != nil {
@@ -75,9 +92,13 @@ func UpKafkaUI(ctx context.Context, cli *client.Client, opts KafkaUIUpOptions) (
 		return result, fmt.Errorf("port %d is used by spin container %q", opts.Port, conflict.Name)
 	}
 
-	networkName := KafkaNetworkName(opts.KafkaName)
-	if err := EnsureNetwork(ctx, cli, networkName); err != nil {
-		return result, err
+	var networkingConfig *network.NetworkingConfig
+	if opts.KafkaName != "" {
+		networkName := KafkaNetworkName(opts.KafkaName)
+		if err := EnsureNetwork(ctx, cli, networkName); err != nil {
+			return result, err
+		}
+		networkingConfig = networkConfig(networkName)
 	}
 
 	const imageRef = "provectuslabs/kafka-ui:v0.7.2"
@@ -100,7 +121,7 @@ func UpKafkaUI(ctx context.Context, cli *client.Client, opts KafkaUIUpOptions) (
 		&container.HostConfig{
 			PortBindings: kafkaUIPortMap(opts.Port),
 		},
-		networkConfig(networkName),
+		networkingConfig,
 		nil,
 		containerName,
 	)
@@ -118,6 +139,10 @@ func UpKafkaUI(ctx context.Context, cli *client.Client, opts KafkaUIUpOptions) (
 }
 
 func kafkaUIEnv(opts KafkaUIUpOptions) []string {
+	if opts.KafkaName == "" {
+		return nil
+	}
+
 	env := []string{
 		"KAFKA_CLUSTERS_0_NAME=local",
 		fmt.Sprintf("KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=%s", KafkaBootstrapForUI(opts.KafkaName)),

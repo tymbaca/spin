@@ -21,13 +21,13 @@ const (
 )
 
 type KafkaUpOptions struct {
-	Name     string
-	Port     int
-	Protocol string
+	Name      string
+	Port      int
+	Protocol  string
 	Mechanism string
-	User     string
-	Password string
-	WithUI   bool
+	User      string
+	Password  string
+	WithUI    bool
 }
 
 func (opts KafkaUpOptions) withDefaults() KafkaUpOptions {
@@ -56,12 +56,6 @@ func UpKafka(ctx context.Context, cli *client.Client, opts KafkaUpOptions) (UpRe
 	}
 
 	if existing != nil {
-		if opts.WithUI {
-			if err := requireKafkaWithUI(ctx, cli, opts.Name); err != nil {
-				return result, err
-			}
-		}
-
 		if existing.Port != opts.Port {
 			return result, fmt.Errorf("container %q already exists on port %d; use that port or run spin rm %q first", opts.Name, existing.Port, opts.Name)
 		}
@@ -270,8 +264,9 @@ func requireKafkaWithUI(ctx context.Context, cli *client.Client, name string) er
 		return nil
 	}
 	return fmt.Errorf(
-		"container %q was created without kafka-ui support; run spin rm %q and create again with --ui-port",
+		"container %q was created without kafka-ui support; run spin rm %q and create it again with spin up kafka %q",
 		name, name,
+		name,
 	)
 }
 
