@@ -5,44 +5,37 @@ import (
 	"fmt"
 
 	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 )
 
-const (
-	DefaultPostgresUser     = "postgres"
-	DefaultPostgresPassword = "postgres"
-	DefaultPostgresDatabase = "postgres"
-)
-
-type PostgresUpOptions struct {
-	Name     string
-	Port     int
-	User     string
-	Password string
-	Database string
+type KafkaUIUpOptions struct {
+	Name      string
+	KafkaName string
+	Port      int
+	Protocol  string
+	Mechanism string
+	User      string
+	Password  string
 }
 
-func (opts PostgresUpOptions) withDefaults() PostgresUpOptions {
+func (opts KafkaUIUpOptions) withDefaults() KafkaUIUpOptions {
+	if opts.Protocol == "" {
+		opts.Protocol = DefaultKafkaProtocol
+	}
+	if opts.Mechanism == "" {
+		opts.Mechanism = DefaultKafkaMechanism
+	}
 	if opts.User == "" {
-		opts.User = DefaultPostgresUser
+		opts.User = DefaultKafkaUser
 	}
 	if opts.Password == "" {
-		opts.Password = DefaultPostgresPassword
-	}
-	if opts.Database == "" {
-		opts.Database = DefaultPostgresDatabase
+		opts.Password = DefaultKafkaPassword
 	}
 	return opts
 }
 
-type UpResult struct {
-	Port    int
-	Started bool
-}
-
-func UpPostgres(ctx context.Context, cli *client.Client, opts PostgresUpOptions) (UpResult, error) {
+func UpKafkaUI(ctx context.Context, cli *client.Client, opts KafkaUIUpOptions) (UpResult, error) {
 	opts = opts.withDefaults()
 	result := UpResult{Port: opts.Port}
 
@@ -62,14 +55,14 @@ func UpPostgres(ctx context.Context, cli *client.Client, opts PostgresUpOptions)
 		}
 
 		if state == "running" {
-			fmt.Printf("container %q is already running on 127.0.0.1:%d\n", opts.Name, opts.Port)
+			fmt.Printf("container %q is already running on http://127.0.0.1:%d\n", opts.Name, opts.Port)
 			return result, nil
 		}
 
 		if err := cli.ContainerStart(ctx, ContainerName(opts.Name), container.StartOptions{}); err != nil {
 			return result, fmt.Errorf("start container: %w", err)
 		}
-		fmt.Printf("started container %q on 127.0.0.1:%d\n", opts.Name, opts.Port)
+		fmt.Printf("started container %q on http://127.0.0.1:%d\n", opts.Name, opts.Port)
 		result.Started = true
 		return result, nil
 	}
@@ -82,12 +75,12 @@ func UpPostgres(ctx context.Context, cli *client.Client, opts PostgresUpOptions)
 		return result, fmt.Errorf("port %d is used by spin container %q", opts.Port, conflict.Name)
 	}
 
-	volumeName := VolumeName(opts.Name)
-	if err := ensureVolume(ctx, cli, volumeName, opts.Name, ServicePostgres); err != nil {
+	networkName := KafkaNetworkName(opts.KafkaName)
+	if err := EnsureNetwork(ctx, cli, networkName); err != nil {
 		return result, err
 	}
 
-	const imageRef = "postgres:16"
+	const imageRef = "provectuslabs/kafka-ui:v0.7.2"
 	if err := EnsureImage(ctx, cli, imageRef); err != nil {
 		return result, err
 	}
@@ -96,23 +89,18 @@ func UpPostgres(ctx context.Context, cli *client.Client, opts PostgresUpOptions)
 	resp, err := cli.ContainerCreate(ctx,
 		&container.Config{
 			Image: imageRef,
-			Env: []string{
-				"POSTGRES_USER=" + opts.User,
-				"POSTGRES_PASSWORD=" + opts.Password,
-				"POSTGRES_DB=" + opts.Database,
-			},
+			Env:   kafkaUIEnv(opts),
 			Labels: map[string]string{
 				LabelManaged: "true",
 				LabelName:    opts.Name,
-				LabelService: ServicePostgres,
+				LabelService: ServiceKafkaUI,
 				LabelPort:    fmt.Sprintf("%d", opts.Port),
 			},
 		},
 		&container.HostConfig{
-			PortBindings: natPortMap(opts.Port),
-			Binds:        []string{volumeName + ":/var/lib/postgresql/data"},
+			PortBindings: kafkaUIPortMap(opts.Port),
 		},
-		nil,
+		networkConfig(networkName),
 		nil,
 		containerName,
 	)
@@ -124,37 +112,37 @@ func UpPostgres(ctx context.Context, cli *client.Client, opts PostgresUpOptions)
 		return result, fmt.Errorf("start container: %w", err)
 	}
 
-	fmt.Printf("created and started container %q on 127.0.0.1:%d\n", opts.Name, opts.Port)
+	fmt.Printf("created and started container %q on http://127.0.0.1:%d\n", opts.Name, opts.Port)
 	result.Started = true
 	return result, nil
 }
 
-func ensureVolume(ctx context.Context, cli *client.Client, volumeName, spinName, service string) error {
-	_, err := cli.VolumeInspect(ctx, volumeName)
-	if err == nil {
-		return nil
-	}
-	if !client.IsErrNotFound(err) {
-		return fmt.Errorf("inspect volume: %w", err)
+func kafkaUIEnv(opts KafkaUIUpOptions) []string {
+	env := []string{
+		"KAFKA_CLUSTERS_0_NAME=local",
+		fmt.Sprintf("KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=%s", KafkaBootstrapForUI(opts.KafkaName)),
 	}
 
-	_, err = cli.VolumeCreate(ctx, volume.CreateOptions{
-		Name: volumeName,
-		Labels: map[string]string{
-			LabelManaged: "true",
-			LabelName:    spinName,
-			LabelService: service,
-		},
-	})
-	if err != nil {
-		return fmt.Errorf("create volume: %w", err)
+	if opts.Protocol != "PLAINTEXT" {
+		env = append(env, fmt.Sprintf("KAFKA_CLUSTERS_0_PROPERTIES_SECURITY_PROTOCOL=%s", opts.Protocol))
 	}
-	return nil
+
+	if kafkaUsesSASL(opts.Protocol) && opts.Mechanism == "PLAIN" {
+		env = append(env,
+			fmt.Sprintf("KAFKA_CLUSTERS_0_PROPERTIES_SASL_MECHANISM=%s", opts.Mechanism),
+			fmt.Sprintf(
+				`KAFKA_CLUSTERS_0_PROPERTIES_SASL_JAAS_CONFIG=org.apache.kafka.common.security.plain.PlainLoginModule required username="%s" password="%s";`,
+				opts.User, opts.Password,
+			),
+		)
+	}
+
+	return env
 }
 
-func natPortMap(port int) nat.PortMap {
+func kafkaUIPortMap(port int) nat.PortMap {
 	return nat.PortMap{
-		nat.Port("5432/tcp"): []nat.PortBinding{{
+		nat.Port("8080/tcp"): []nat.PortBinding{{
 			HostIP:   "127.0.0.1",
 			HostPort: fmt.Sprintf("%d", port),
 		}},

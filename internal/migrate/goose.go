@@ -15,8 +15,36 @@ const (
 	pollInterval   = 500 * time.Millisecond
 )
 
-func WaitForPostgres(ctx context.Context, port int) error {
-	dsn := postgresDSN(port)
+type PostgresConfig struct {
+	Port     int
+	User     string
+	Password string
+	Database string
+}
+
+func (cfg PostgresConfig) withDefaults() PostgresConfig {
+	if cfg.User == "" {
+		cfg.User = "postgres"
+	}
+	if cfg.Password == "" {
+		cfg.Password = "postgres"
+	}
+	if cfg.Database == "" {
+		cfg.Database = "postgres"
+	}
+	return cfg
+}
+
+func (cfg PostgresConfig) dsn() string {
+	cfg = cfg.withDefaults()
+	return fmt.Sprintf(
+		"postgres://%s:%s@127.0.0.1:%d/%s?sslmode=disable",
+		cfg.User, cfg.Password, cfg.Port, cfg.Database,
+	)
+}
+
+func WaitForPostgres(ctx context.Context, cfg PostgresConfig) error {
+	dsn := cfg.withDefaults().dsn()
 	deadline, ok := ctx.Deadline()
 	if !ok {
 		deadline = time.Now().Add(defaultTimeout)
@@ -32,7 +60,7 @@ func WaitForPostgres(ctx context.Context, port int) error {
 		case <-time.After(pollInterval):
 		}
 	}
-	return fmt.Errorf("postgres on port %d did not become ready within timeout", port)
+	return fmt.Errorf("postgres on port %d did not become ready within timeout", cfg.Port)
 }
 
 func ping(dsn string) error {
@@ -44,12 +72,13 @@ func ping(dsn string) error {
 	return db.Ping()
 }
 
-func RunGoose(ctx context.Context, port int, dir string) error {
-	if err := WaitForPostgres(ctx, port); err != nil {
+func RunGoose(ctx context.Context, cfg PostgresConfig, dir string) error {
+	cfg = cfg.withDefaults()
+	if err := WaitForPostgres(ctx, cfg); err != nil {
 		return err
 	}
 
-	dsn := postgresDSN(port)
+	dsn := cfg.dsn()
 	db, err := sql.Open("pgx", dsn)
 	if err != nil {
 		return fmt.Errorf("open database: %w", err)
@@ -66,8 +95,4 @@ func RunGoose(ctx context.Context, port int, dir string) error {
 
 	fmt.Printf("migrations applied from %s\n", dir)
 	return nil
-}
-
-func postgresDSN(port int) string {
-	return fmt.Sprintf("postgres://postgres:postgres@127.0.0.1:%d/postgres?sslmode=disable", port)
 }
