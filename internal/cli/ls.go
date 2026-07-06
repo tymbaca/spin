@@ -66,6 +66,8 @@ func credentialsFor(c docker.ContainerInfo) string {
 		})
 	case docker.ServiceKafkaUI:
 		return fmt.Sprintf("http://127.0.0.1:%d", c.Port)
+	case docker.ServiceRedis:
+		return fmt.Sprintf("redis://127.0.0.1:%d", c.Port)
 	default:
 		return ""
 	}

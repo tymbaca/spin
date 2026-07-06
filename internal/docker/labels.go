@@ -19,6 +19,7 @@ const (
 	ServicePostgres = "postgres"
 	ServiceKafka    = "kafka"
 	ServiceKafkaUI  = "kafka-ui"
+	ServiceRedis    = "redis"
 )
 
 func KafkaUIName(kafkaName string) string {

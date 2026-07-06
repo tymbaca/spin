@@ -28,6 +28,7 @@ var (
 	kafkaTopics        string
 	kafkaUIPort        int
 	kafkaUIOnlyPort    int
+	redisPort          int
 )
 
 var upCmd = &cobra.Command{
@@ -156,6 +157,27 @@ var upKafkaUICmd = &cobra.Command{
 	},
 }
 
+var upRedisCmd = &cobra.Command{
+	Use:   "redis <name>",
+	Short: "Create or start a Redis container",
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		ctx := cmd.Context()
+		name := args[0]
+
+		cli, err := docker.NewClient(ctx)
+		exitOnError(err)
+
+		exitOnError(resolvePortConflict(ctx, cli, name, redisPort))
+
+		_, err = docker.UpRedis(ctx, cli, docker.RedisUpOptions{
+			Name: name,
+			Port: redisPort,
+		})
+		exitOnError(err)
+	},
+}
+
 func resolvePortConflict(ctx context.Context, cli *client.Client, name string, port int) error {
 	conflict, err := docker.FindByHostPort(ctx, cli, port)
 	if err != nil {
@@ -197,11 +219,13 @@ func init() {
 	upKafkaCmd.Flags().StringVar(&kafkaTopics, "topics", "", "comma-separated Kafka topic names to create")
 	upKafkaCmd.Flags().IntVar(&kafkaUIPort, "ui-port", 0, "host port to bind Kafka UI on (creates a separate spin container named <name>-ui)")
 	upKafkaUICmd.Flags().IntVar(&kafkaUIOnlyPort, "port", 9000, "host port to bind Kafka UI on")
+	upRedisCmd.Flags().IntVar(&redisPort, "port", 6379, "host port to bind Redis on")
 
 	upKafkaCmd.MarkFlagsMutuallyExclusive("topic-list", "topics")
 
 	upCmd.AddCommand(upPostgresCmd)
 	upCmd.AddCommand(upKafkaCmd)
 	upCmd.AddCommand(upKafkaUICmd)
+	upCmd.AddCommand(upRedisCmd)
 	rootCmd.AddCommand(upCmd)
 }
