@@ -29,11 +29,31 @@ var (
 	kafkaUIPort        int
 	kafkaUIOnlyPort    int
 	redisPort          int
+	upAll              bool
 )
 
 var upCmd = &cobra.Command{
 	Use:   "up",
 	Short: "Create or start spin-managed containers",
+	Args: func(cmd *cobra.Command, args []string) error {
+		if upAll {
+			if len(args) != 0 {
+				return fmt.Errorf("service cannot be specified with --all")
+			}
+			return nil
+		}
+		if len(args) != 0 {
+			return fmt.Errorf("unknown service %q", args[0])
+		}
+		return fmt.Errorf("service required")
+	},
+	Run: func(cmd *cobra.Command, args []string) {
+		ctx := cmd.Context()
+		cli, err := docker.NewClient(ctx)
+		exitOnError(err)
+
+		exitOnError(upStopped(ctx, cli))
+	},
 }
 
 var upPostgresCmd = &cobra.Command{
@@ -204,7 +224,34 @@ func resolvePortConflict(ctx context.Context, cli *client.Client, name string, p
 	return docker.Down(ctx, cli, conflict.Name)
 }
 
+func upStopped(ctx context.Context, cli *client.Client) error {
+	containers, err := docker.ListManaged(ctx, cli)
+	if err != nil {
+		return err
+	}
+	if len(containers) == 0 {
+		fmt.Println("no spin-managed containers")
+		return nil
+	}
+
+	started := 0
+	for _, c := range containers {
+		if c.State == docker.StateRunning {
+			continue
+		}
+		if err := docker.Start(ctx, cli, c.Name); err != nil {
+			return err
+		}
+		started++
+	}
+	if started == 0 {
+		fmt.Println("no stopped spin-managed containers")
+	}
+	return nil
+}
+
 func init() {
+	upCmd.Flags().BoolVar(&upAll, "all", false, "start all stopped spin-managed containers")
 	upPostgresCmd.Flags().IntVar(&postgresPort, "port", 5432, "host port to bind Postgres on")
 	upPostgresCmd.Flags().StringVar(&postgresUser, "user", "postgres", "Postgres user")
 	upPostgresCmd.Flags().StringVar(&postgresPassword, "password", "postgres", "Postgres password")

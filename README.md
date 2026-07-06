@@ -111,6 +111,26 @@ spin down mykafka      # kafka stopped, UI still running
 spin rm mykafka-ui     # remove UI separately
 ```
 
+## Redis
+
+Start a Redis container:
+
+```bash
+spin up redis myredis
+```
+
+Connect with the default port:
+
+```
+redis://127.0.0.1:6379
+```
+
+Use a custom port:
+
+```bash
+spin up redis myredis --port 6380
+```
+
 ## List containers
 
 ```bash
@@ -129,9 +149,16 @@ Example output:
 NAME      SERVICE    PORT   STATUS   VOLUME
 mydb      postgres   5432   running  spin-mydb-data
 mykafka   kafka      9092   running  spin-mykafka-data
+myredis   redis      6379   running  spin-myredis-data
 ```
 
-## Stop and remove
+## Start, stop, and remove
+
+Start all stopped spin-managed containers:
+
+```bash
+spin up --all
+```
 
 Stop a container (keeps data):
 
@@ -172,12 +199,16 @@ port 5432 is used by spin container "olddb" (running). Spin it down and continue
 spin up postgres api-db --migrations ./migrations
 spin up kafka api-kafka --topics orders,payments
 spin up kafka-ui api-kafka-ui
+spin up redis api-redis
 
 # check what's running
 spin ls -o wide
 
 # done for the day
 spin down --all
+
+# start everything again
+spin up --all
 
 # clean up completely
 spin rm --all
