@@ -169,7 +169,7 @@ func resolvePortConflict(ctx context.Context, cli *client.Client, name string, p
 		"port %d is used by spin container %q (%s). Spin it down and continue?",
 		port,
 		conflict.Name,
-		conflict.Status,
+		conflict.State,
 	)
 	ok, err := prompt.Confirm(msg)
 	if err != nil {

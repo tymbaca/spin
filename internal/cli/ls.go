@@ -40,9 +40,9 @@ var lsCmd = &cobra.Command{
 		}
 		for _, c := range containers {
 			if lsOutput == "wide" {
-				fmt.Fprintf(w, "%s\t%s\t%d\t%s\t%s\t%s\n", c.Name, c.Service, c.Port, c.Status, c.Volume, credentialsFor(c))
+				fmt.Fprintf(w, "%s\t%s\t%d\t%s\t%s\t%s\n", c.Name, c.Service, c.Port, c.State, c.Volume, credentialsFor(c))
 			} else {
-				fmt.Fprintf(w, "%s\t%s\t%d\t%s\t%s\n", c.Name, c.Service, c.Port, c.Status, c.Volume)
+				fmt.Fprintf(w, "%s\t%s\t%d\t%s\t%s\n", c.Name, c.Service, c.Port, c.State, c.Volume)
 			}
 		}
 		exitOnError(w.Flush())

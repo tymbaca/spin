@@ -31,7 +31,7 @@ type ContainerInfo struct {
 	Name        string
 	Service     string
 	Port        int
-	Status      State
+	State       State
 	Volume      string
 	Credentials CredentialInfo
 }
@@ -80,7 +80,7 @@ func containerInfoFromSummary(c container.Summary, env []string) (ContainerInfo,
 		Name:        spinName,
 		Service:     service,
 		Port:        port,
-		Status:      State(c.State),
+		State:       State(c.State),
 		Volume:      VolumeName(spinName),
 		Credentials: credentialsFromContainer(service, c.Labels, env),
 	}, nil
@@ -238,7 +238,7 @@ func FindByHostPort(ctx context.Context, cli *client.Client, port int) (*Contain
 		return nil, err
 	}
 	for _, c := range managed {
-		if c.Port == port && c.Status == StateRunning {
+		if c.Port == port && c.State == StateRunning {
 			return &c, nil
 		}
 	}
