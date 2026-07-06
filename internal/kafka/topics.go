@@ -13,11 +13,11 @@ import (
 )
 
 const (
-	defaultUsername = "admin"
-	defaultPassword = "admin"
-	defaultProtocol = "SASL_PLAINTEXT"
+	defaultUsername  = "admin"
+	defaultPassword  = "admin"
+	defaultProtocol  = "SASL_PLAINTEXT"
 	defaultMechanism = "PLAIN"
-	pollInterval    = 500 * time.Millisecond
+	pollInterval     = 500 * time.Millisecond
 )
 
 type AuthConfig struct {
@@ -152,6 +152,9 @@ func Credentials(port int) string {
 
 func CredentialsWithAuth(cfg AuthConfig) string {
 	cfg = cfg.withDefaults()
+	if cfg.Protocol == "PLAINTEXT" || cfg.Protocol == "SSL" {
+		return fmt.Sprintf("%s %s", Address(cfg.Port), cfg.Protocol)
+	}
 	return fmt.Sprintf(
 		"%s %s %s username=%s password=%s",
 		Address(cfg.Port), cfg.Protocol, cfg.Mechanism, cfg.User, cfg.Password,

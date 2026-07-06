@@ -71,7 +71,7 @@ func UpKafkaUI(ctx context.Context, cli *client.Client, opts KafkaUIUpOptions) (
 			return result, err
 		}
 
-		if state == "running" {
+		if state == StateRunning {
 			fmt.Printf("container %q is already running on http://127.0.0.1:%d\n", opts.Name, opts.Port)
 			return result, nil
 		}
@@ -139,14 +139,15 @@ func UpKafkaUI(ctx context.Context, cli *client.Client, opts KafkaUIUpOptions) (
 }
 
 func kafkaUIEnv(opts KafkaUIUpOptions) []string {
+	env := []string{"DYNAMIC_CONFIG_ENABLED=true"}
 	if opts.KafkaName == "" {
-		return nil
+		return env
 	}
 
-	env := []string{
+	env = append(env,
 		"KAFKA_CLUSTERS_0_NAME=local",
 		fmt.Sprintf("KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=%s", KafkaBootstrapForUI(opts.KafkaName)),
-	}
+	)
 
 	if opts.Protocol != "PLAINTEXT" {
 		env = append(env, fmt.Sprintf("KAFKA_CLUSTERS_0_PROPERTIES_SECURITY_PROTOCOL=%s", opts.Protocol))

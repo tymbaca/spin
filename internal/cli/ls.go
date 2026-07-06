@@ -52,14 +52,32 @@ var lsCmd = &cobra.Command{
 func credentialsFor(c docker.ContainerInfo) string {
 	switch c.Service {
 	case docker.ServicePostgres:
-		return fmt.Sprintf("postgres://postgres:postgres@127.0.0.1:%d/postgres?sslmode=disable", c.Port)
+		user := firstNonEmpty(c.Credentials.User, docker.DefaultPostgresUser)
+		password := firstNonEmpty(c.Credentials.Password, docker.DefaultPostgresPassword)
+		database := firstNonEmpty(c.Credentials.Database, docker.DefaultPostgresDatabase)
+		return fmt.Sprintf("postgres://%s:%s@127.0.0.1:%d/%s?sslmode=disable", user, password, c.Port, database)
 	case docker.ServiceKafka:
-		return kafka.Credentials(c.Port)
+		return kafka.CredentialsWithAuth(kafka.AuthConfig{
+			Port:      c.Port,
+			Protocol:  c.Credentials.Protocol,
+			Mechanism: c.Credentials.Mechanism,
+			User:      c.Credentials.User,
+			Password:  c.Credentials.Password,
+		})
 	case docker.ServiceKafkaUI:
 		return fmt.Sprintf("http://127.0.0.1:%d", c.Port)
 	default:
 		return ""
 	}
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 func init() {

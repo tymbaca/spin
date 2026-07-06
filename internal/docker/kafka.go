@@ -65,7 +65,7 @@ func UpKafka(ctx context.Context, cli *client.Client, opts KafkaUpOptions) (UpRe
 			return result, err
 		}
 
-		if state == "running" {
+		if state == StateRunning {
 			fmt.Printf("container %q is already running on 127.0.0.1:%d\n", opts.Name, opts.Port)
 			return result, nil
 		}
@@ -97,10 +97,14 @@ func UpKafka(ctx context.Context, cli *client.Client, opts KafkaUpOptions) (UpRe
 	}
 
 	labels := map[string]string{
-		LabelManaged: "true",
-		LabelName:    opts.Name,
-		LabelService: ServiceKafka,
-		LabelPort:    fmt.Sprintf("%d", opts.Port),
+		LabelManaged:                  "true",
+		LabelName:                     opts.Name,
+		LabelService:                  ServiceKafka,
+		LabelPort:                     fmt.Sprintf("%d", opts.Port),
+		LabelCredentialKafkaProtocol:  opts.Protocol,
+		LabelCredentialKafkaMechanism: opts.Mechanism,
+		LabelCredentialKafkaUser:      opts.User,
+		LabelCredentialKafkaPassword:  opts.Password,
 	}
 	if opts.WithUI {
 		labels[LabelKafkaWithUI] = "true"

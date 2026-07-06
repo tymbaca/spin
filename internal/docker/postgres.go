@@ -61,7 +61,7 @@ func UpPostgres(ctx context.Context, cli *client.Client, opts PostgresUpOptions)
 			return result, err
 		}
 
-		if state == "running" {
+		if state == StateRunning {
 			fmt.Printf("container %q is already running on 127.0.0.1:%d\n", opts.Name, opts.Port)
 			return result, nil
 		}
@@ -102,10 +102,13 @@ func UpPostgres(ctx context.Context, cli *client.Client, opts PostgresUpOptions)
 				"POSTGRES_DB=" + opts.Database,
 			},
 			Labels: map[string]string{
-				LabelManaged: "true",
-				LabelName:    opts.Name,
-				LabelService: ServicePostgres,
-				LabelPort:    fmt.Sprintf("%d", opts.Port),
+				LabelManaged:                    "true",
+				LabelName:                       opts.Name,
+				LabelService:                    ServicePostgres,
+				LabelPort:                       fmt.Sprintf("%d", opts.Port),
+				LabelCredentialPostgresUser:     opts.User,
+				LabelCredentialPostgresPassword: opts.Password,
+				LabelCredentialPostgresDatabase: opts.Database,
 			},
 		},
 		&container.HostConfig{
