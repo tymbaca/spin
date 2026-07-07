@@ -143,6 +143,10 @@ func credentialsFromLabels(service string, labels map[string]string) CredentialI
 			Protocol:  labels[LabelCredentialKafkaProtocol],
 			Mechanism: labels[LabelCredentialKafkaMechanism],
 		}
+	case ServiceRedis:
+		return CredentialInfo{
+			Password: labels[LabelCredentialRedisPassword],
+		}
 	default:
 		return CredentialInfo{}
 	}

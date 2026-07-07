@@ -63,3 +63,13 @@ func TestCredentialsFromContainerFallsBackToKafkaEnv(t *testing.T) {
 		t.Fatalf("Password = %q, want %q", credentials.Password, "mypass")
 	}
 }
+
+func TestCredentialsFromContainerReadsRedisPasswordLabel(t *testing.T) {
+	credentials := credentialsFromContainer(ServiceRedis, map[string]string{
+		LabelCredentialRedisPassword: "secret",
+	}, nil)
+
+	if credentials.Password != "secret" {
+		t.Fatalf("Password = %q, want %q", credentials.Password, "secret")
+	}
+}

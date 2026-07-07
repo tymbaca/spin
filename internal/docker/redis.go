@@ -10,8 +10,9 @@ import (
 )
 
 type RedisUpOptions struct {
-	Name string
-	Port int
+	Name     string
+	Port     int
+	Password string
 }
 
 func UpRedis(ctx context.Context, cli *client.Client, opts RedisUpOptions) (UpResult, error) {
@@ -63,16 +64,22 @@ func UpRedis(ctx context.Context, cli *client.Client, opts RedisUpOptions) (UpRe
 		return result, err
 	}
 
+	labels := map[string]string{
+		LabelManaged: "true",
+		LabelName:    opts.Name,
+		LabelService: ServiceRedis,
+		LabelPort:    fmt.Sprintf("%d", opts.Port),
+	}
+	if opts.Password != "" {
+		labels[LabelCredentialRedisPassword] = opts.Password
+	}
+
 	containerName := ContainerName(opts.Name)
 	resp, err := cli.ContainerCreate(ctx,
 		&container.Config{
-			Image: imageRef,
-			Labels: map[string]string{
-				LabelManaged: "true",
-				LabelName:    opts.Name,
-				LabelService: ServiceRedis,
-				LabelPort:    fmt.Sprintf("%d", opts.Port),
-			},
+			Image:  imageRef,
+			Cmd:    redisCommand(opts),
+			Labels: labels,
 		},
 		&container.HostConfig{
 			PortBindings: redisPortMap(opts.Port),
@@ -93,6 +100,13 @@ func UpRedis(ctx context.Context, cli *client.Client, opts RedisUpOptions) (UpRe
 	fmt.Printf("created and started container %q on 127.0.0.1:%d\n", opts.Name, opts.Port)
 	result.Started = true
 	return result, nil
+}
+
+func redisCommand(opts RedisUpOptions) []string {
+	if opts.Password == "" {
+		return nil
+	}
+	return []string{"redis-server", "--requirepass", opts.Password}
 }
 
 func redisPortMap(port int) nat.PortMap {

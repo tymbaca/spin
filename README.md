@@ -131,6 +131,18 @@ Use a custom port:
 spin up redis myredis --port 6380
 ```
 
+Set a password:
+
+```bash
+spin up redis myredis --password secret
+```
+
+Connect with a password:
+
+```
+redis://:secret@127.0.0.1:6379
+```
+
 ## List containers
 
 ```bash

@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"text/tabwriter"
 
@@ -67,6 +68,14 @@ func credentialsFor(c docker.ContainerInfo) string {
 	case docker.ServiceKafkaUI:
 		return fmt.Sprintf("http://127.0.0.1:%d", c.Port)
 	case docker.ServiceRedis:
+		if c.Credentials.Password != "" {
+			u := url.URL{
+				Scheme: "redis",
+				User:   url.UserPassword("", c.Credentials.Password),
+				Host:   fmt.Sprintf("127.0.0.1:%d", c.Port),
+			}
+			return u.String()
+		}
 		return fmt.Sprintf("redis://127.0.0.1:%d", c.Port)
 	default:
 		return ""

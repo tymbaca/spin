@@ -29,6 +29,7 @@ var (
 	kafkaUIPort        int
 	kafkaUIOnlyPort    int
 	redisPort          int
+	redisPassword      string
 	upAll              bool
 )
 
@@ -191,8 +192,9 @@ var upRedisCmd = &cobra.Command{
 		exitOnError(resolvePortConflict(ctx, cli, name, redisPort))
 
 		_, err = docker.UpRedis(ctx, cli, docker.RedisUpOptions{
-			Name: name,
-			Port: redisPort,
+			Name:     name,
+			Port:     redisPort,
+			Password: redisPassword,
 		})
 		exitOnError(err)
 	},
@@ -267,6 +269,7 @@ func init() {
 	upKafkaCmd.Flags().IntVar(&kafkaUIPort, "ui-port", 0, "host port to bind Kafka UI on (creates a separate spin container named <name>-ui)")
 	upKafkaUICmd.Flags().IntVar(&kafkaUIOnlyPort, "port", 9000, "host port to bind Kafka UI on")
 	upRedisCmd.Flags().IntVar(&redisPort, "port", 6379, "host port to bind Redis on")
+	upRedisCmd.Flags().StringVar(&redisPassword, "password", "", "Redis password")
 
 	upKafkaCmd.MarkFlagsMutuallyExclusive("topic-list", "topics")
 

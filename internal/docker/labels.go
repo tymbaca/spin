@@ -12,6 +12,7 @@ const (
 	LabelCredentialKafkaPassword    = "com.spin.credentials.kafka.password"
 	LabelCredentialKafkaProtocol    = "com.spin.credentials.kafka.protocol"
 	LabelCredentialKafkaMechanism   = "com.spin.credentials.kafka.mechanism"
+	LabelCredentialRedisPassword    = "com.spin.credentials.redis.password"
 	LabelKafkaWithUI                = "com.spin.kafka.with-ui"
 )
 
